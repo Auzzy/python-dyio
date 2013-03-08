@@ -125,9 +125,10 @@ class DatagramParserV4(DatagramParser):
 	@staticmethod
 	def parse(port):
 		header = bytearray(port.read(11))
-		length = DatagramParserV4._parse_header(header)
+		priority,,encrypted,length = DatagramParserV4._parse_header(header)
 		func = bytearray(port.read(length))
-		return DatagramParserV4._parse_func(func)
+		name,args = DatagramParserV4._parse_func(func)
+		return name,args,affect,encrypted
 
 	@staticmethod
 	def _parse_header(header):
@@ -137,20 +138,24 @@ class DatagramParserV4(DatagramParser):
 		payload_size = header[9]
 		checksum = header[10]
 		
-		data_checksum = sum(bytearray([0x4]) + header[:10]) & 0x000000FF
+		data_checksum = 4+sum(header[:10]) & 0x000000FF
 		if checksum!=data_checksum:
 			raise IOError("The received data was corrupted.")
 		
-		return length
+		priority = affect >> 3
+		state = (affect >> 2) & 0x1
+		async = (affect >> 1) & 0x1
+		dir = affect & 0x1
+		return priority,state,async,dir,encrypted,length
 
 	@staticmethod
 	def _parse_func(func):
+		checksum = func.pop()
 		ns = func[0]
 		name = func[1:5]
-		args = func[5:7]
-		checksum = func[7]
+		args = func[5:]
 		
-		data_checksum = sum(func[:7]) & 0x000000FF
+		data_checksum = sum(func) & 0x000000FF
 		if checksum!=data_checksum:
 			raise IOError("The received data was corrupted.")
 
@@ -160,9 +165,10 @@ class DatagramParserV3(DatagramParser):
 	@staticmethod
 	def parse(port):
 		header = bytearray(port.read(10))
-		length = DatagramParserV3._parse_header(header)
+		affect,length = DatagramParserV3._parse_header(header)
 		func = bytearray(port.read(length))
-		return DatagramParserV3._parse_func(func)
+		name,args = DatagramParserV3._parse_func(func)
+		return name,args,affect
 
 	@staticmethod
 	def _parse_header(header):
@@ -172,35 +178,26 @@ class DatagramParserV3(DatagramParser):
 		length = header[8]
 		checksum = header[9]
 		
-		data_checksum = sum(bytearray([0x3]) + header[:9]) & 0x000000FF
+		data_checksum = 3+sum(header[:9]) & 0x000000FF
 		if checksum!=data_checksum:
 			raise IOError("The received data was corrupted.")
 		
-		return length
+		return affect,length
 
 	@staticmethod
 	def _parse_func(func):
 		return func[:4],func[4:]
 
 
-# def build_datagram(mac, affect, ns, func, *args):
+
 def build_datagram(mac, func, priority=32, state=False, async=False, encrypted=False, ns=0x0, args=[]):
-	# ns = ns if ns else 0x0
-	
 	builder = DatagramBuilder.get(VERSION)
-	# return builder.build(mac,affect,ns,func,*args)
 	return builder.build(mac,func,priority,state,async,encrypted,ns,args=[])
 
 def send_datagram(port, datagram):
-	for byte in datagram:
-		print hex(byte)
-
 	port.write(datagram)
 	port.flush()
 
 def receive_datagram(port):
 	parser = DatagramParser.get(port)
 	return parser.parse(port)
-
-
-# print int("".join(["{:0>2}".format(byte) for byte in bytearray(response)]),16)

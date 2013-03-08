@@ -41,13 +41,12 @@ class DyIO(object):
 	def exec_command(self, func, priority=32, state=False, async=False, encrypted=False, ns=0x0, args=[]):
 		ns = ns if ns else 0x0
 		
-		# datagram = bowler.build_datagram(self.mac,affect,ns,name,*args)
 		datagram = bowler.build_datagram(self.mac,func,priority,state,async,encrypted,ns,args)
 		bowler.send_datagram(self.port,datagram)
 	
+	# RETURN: func, args, priority, state, async, dir, encrypted
 	def receive(self):
-		name,args = bowler.receive_datagram(self.port)
-		return args
+		return bowler.receive_datagram(self.port)
 
 
 def bytes_to_int(bytearr):
@@ -61,8 +60,7 @@ if __name__=="__main__":
 	dyio = DyIO("COM3","74:F7:26:80:00:4F")
 	exec_command(dyio,"_nms",bowler.Affect.GET)
 
-	response = dyio.receive()
-	print "\nRESPONSE"
-	for byte in response:
+	func,args,priority,state,async,dir,encrypted = dyio.receive()
+	for byte in args:
 		print hex(byte)
 	print
