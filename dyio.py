@@ -3,18 +3,24 @@ from serial import Serial
 import re
 
 import bowler
+import namespaces
 
 class DyIO(object):
 	def __init__(self, port, mac):
+		self.mac = self._normalize_mac(mac)
+		self._namespace_list = []
+		self._namespaces = {}
 		if isinstance(port,Serial):
 			self.port = port
 			if not self.port.isOpen():
 				self.port.open()
 		else:
-			self.port = Serial(port=port, baudrate=115200)
+			self.port = Serial(port=port, baudrate=115200, timeout=5)
 		
-		self.mac = self._normalize_mac(mac)
-	
+		bowler.detect_version(port)
+		self._construct_namespaces()
+
+
 	def _normalize_mac(self, mac):
 		if isinstance(mac,(list,tuple)):
 			return ':'.join(["{:>2x}".format(byte) for byte in mac])
@@ -24,8 +30,29 @@ class DyIO(object):
 
 			return re.sub("[- ]", ':', mac)
 	
+	def _construct_namespaces(self):
+		namespaces.init_core(self)
+
+		count = namespaces.count(self)
+		for index in range(count):
+			namespace = namespaces.get(self,index)
+			self._namespace_list.append(namespace.name)
+			self._namespaces[namespace.name] = namespace
+	
+	def get_namespace(self, id):
+		if isinstance(id,int):
+			return self._namespaces[self._namespace_list[id]]
+		else:
+			return self._namespaces[id] if id in self._namespaces else None
+	
+	def get_core_namespace(self):
+		return self._namespaces[0]
+
 	def get_namespaces(self):
 		pass
+
+	
+
 
 	@staticmethod
 	def _get_affect_args(affect):
@@ -38,29 +65,9 @@ class DyIO(object):
 			affect_args["async"] = True
 		return affect_args
 
-	def exec_command(self, func, priority=32, state=False, async=False, encrypted=False, ns=0x0, args=[]):
-		ns = ns if ns else 0x0
-		
-		datagram = bowler.build_datagram(self.mac,func,priority,state,async,encrypted,ns,args)
-		bowler.send_datagram(self.port,datagram)
-	
-	# RETURN: func, args, priority, state, async, dir, encrypted
-	def receive(self):
-		return bowler.receive_datagram(self.port)
 
-
-def bytes_to_int(bytearr):
-	return int("".join(["{:0>2}".format(byte) for byte in bytearray(bytearr)]),16)
-
-def exec_command(dyio, func, affect, encrypted=False, ns=0x0, args=[]):
-	affect_args = DyIO._get_affect_args(affect)
-	return dyio.exec_command(func,encrypted=encrypted,ns=ns,args=args,**affect_args)
 
 if __name__=="__main__":
 	dyio = DyIO("COM3","74:F7:26:80:00:4F")
-	exec_command(dyio,"_nms",bowler.Affect.GET)
-
-	func,args,priority,state,async,dir,encrypted = dyio.receive()
-	for byte in args:
-		print hex(byte)
-	print
+	core = dyio.get_namespace(0)
+	print core.ping()

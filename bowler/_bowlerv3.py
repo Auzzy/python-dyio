@@ -83,6 +83,8 @@ def _unpack_affect(affect):
 		return 32,True,False
 	elif affect==Affect.ASYNC:
 		return 32,False,True
+	else:
+		return 32,False,False
 
 
 def build(mac, func, priority=32, state=False, async=False, encrypted=False, ns=0x0, args=[]):
@@ -94,3 +96,4 @@ def parse(port):
 	func,args,affect,dir = _Parser.parse(port)
 	priority,state,async = _unpack_affect(affect)
 	return func,args,priority,state,async,dir,False
+

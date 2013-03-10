@@ -1,5 +1,9 @@
 version = 3
 
+def detect_version(port):
+	global version
+	version = 3
+
 class _DatagramBuilder(object):
 	@staticmethod
 	def get(version):
@@ -25,13 +29,14 @@ class _DatagramBuilder(object):
 class _DatagramParser(object):
 	@staticmethod
 	def get(port):
-		version = bytearray(port.read())[0]
+		print port.inWaiting()
+		version = bytearray(port.read(1))[0]
 		if version==3:
 			return _bowlerv3.parse
 		elif version==4:
 			return _bowlerv4.parse
 		else:
-			raise ValueError("Received a packet from an unknown version og the Bolwer protocol.")
+			raise ValueError("Received a packet from an unimplemented version of the Bolwer protocol.")
 			
 from bowler import _bowlerv3,_bowlerv4
 
@@ -39,7 +44,7 @@ Affect = _bowlerv3.Affect
 
 def build_datagram(mac, func, priority=32, state=False, async=False, encrypted=False, ns=0x0, args=[]):
 	builder = _DatagramBuilder.get(version)
-	return builder(mac,func,priority,state,async,encrypted,ns,args=[])
+	return builder(mac,func,priority,state,async,encrypted,ns,args)
 
 def send_datagram(port, datagram):
 	port.write(datagram)

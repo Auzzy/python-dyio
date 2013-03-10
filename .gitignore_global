@@ -1,0 +1,6 @@
+### COMPILED PYTHON ###
+*.pyo
+*.pyc
+
+### VIM FILES ###
+*.py~
