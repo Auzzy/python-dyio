@@ -15,11 +15,10 @@ class DyIO(object):
 			if not self.port.isOpen():
 				self.port.open()
 		else:
-			self.port = Serial(port=port, baudrate=115200, timeout=5)
+			self.port = Serial(port=port, baudrate=115200, timeout=1)
 		
-		bowler.detect_version(port)
+		self._detect_bowler_version(self)
 		self._construct_namespaces()
-
 
 	def _normalize_mac(self, mac):
 		if isinstance(mac,(list,tuple)):
@@ -32,12 +31,15 @@ class DyIO(object):
 	
 	def _construct_namespaces(self):
 		namespaces.init_core(self)
-
+		
 		count = namespaces.count(self)
 		for index in range(count):
 			namespace = namespaces.get(self,index)
 			self._namespace_list.append(namespace.name)
 			self._namespaces[namespace.name] = namespace
+	
+	def _detect_bowler_version(self, core):
+		bowler.detect_version(core)
 	
 	def get_namespace(self, id):
 		if isinstance(id,int):
@@ -46,13 +48,7 @@ class DyIO(object):
 			return self._namespaces[id] if id in self._namespaces else None
 	
 	def get_core_namespace(self):
-		return self._namespaces[0]
-
-	def get_namespaces(self):
-		pass
-
-	
-
+		return self.get_namespace(0)
 
 	@staticmethod
 	def _get_affect_args(affect):
@@ -69,5 +65,5 @@ class DyIO(object):
 
 if __name__=="__main__":
 	dyio = DyIO("COM3","74:F7:26:80:00:4F")
-	core = dyio.get_namespace(0)
-	print core.ping()
+	# core = dyio.get_namespace(0)
+	# print core.ping()

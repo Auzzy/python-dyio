@@ -1,5 +1,7 @@
 import re
 
+from serial import SerialTimeoutException
+
 import bowler
 
 class Namespace(object):
@@ -20,8 +22,8 @@ class Namespace(object):
 		name = "{org}.{lib}".format(org=org,lib=lib)
 		return org,lib,ver,name
 	
-	def send(self, func, args=[], priority=32, state=False, async=False, encrypted=False):		
-		datagram = bowler.build_datagram(self._dyio.mac,func,priority,state,async,encrypted,self.index,args)
+	def send(self, func, args=[], priority=31, state=False, async=False, encrypted=False):		
+		datagram = bowler.build_datagram(self._dyio.mac,func,args,priority,state,async,encrypted,self.index)
 		bowler.send_datagram(self._dyio.port,datagram)
 	
 	# RETURN: func, args, priority, state, async, dir, encrypted
@@ -37,7 +39,12 @@ class BcsCore(Namespace):
 
 	def ping(self):
 		self.send("_png")
-		func,args,priority,state,async,dir,encrypted = self.receive()
+		try:
+			func,args,priority,state,async,dir,encrypted = self.receive()
+			# self.receive()
+		except SerialTimeoutException:
+			return False
+
 		return True
 
 	def count_namespaces(self):

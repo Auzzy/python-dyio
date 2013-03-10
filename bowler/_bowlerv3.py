@@ -1,5 +1,7 @@
 from bowler import _DatagramBuilder,_DatagramParser
 
+LENGTH = 11
+
 class Affect(object):
 	STATUS = 0x00
 	GET = 0x10
@@ -33,30 +35,30 @@ class _Builder(_DatagramBuilder):
 		func_bytes = bytearray(4-len(func)) + bytearray(func,"hex")
 		arg_bytes = _Builder.args_to_bytes(args)
 
-		payload = bytearray()
-		payload.extend(func_bytes)
-		payload.extend(arg_bytes)
-		return payload
+		return func_bytes + arg_bytes
 
 class _Parser(_DatagramParser):
 	@staticmethod
-	def parse(port):
-		header = bytearray(port.read(10))
+	def parse(port, header):
 		affect,dir,length = _Parser._parse_header(header)
+		
 		func = bytearray(port.read(length))
+		if not func:
+			raise SerialTimeoutException("A timeout occurred while reading an incoming packet.")
+
 		name,args = _Parser._parse_func(func)
 		return name,args,affect,dir
 
 	@staticmethod
 	def _parse_header(header):
-		mac = header[0:6]
-		affect = header[6]
-		ns = header[7] >> 1
-		dir = header[7] & 0x1
-		length = header[8]
-		checksum = header[9]
+		mac = header[1:7]
+		affect = header[7]
+		ns = header[8] >> 1
+		dir = header[8] & 0x1
+		length = header[9]
+		checksum = header[10]
 		
-		data_checksum = 3+sum(header[:9]) & 0x000000FF
+		data_checksum = sum(header[:10]) & 0x000000FF
 		if checksum!=data_checksum:
 			raise IOError("The received data was corrupted.")
 		
@@ -87,13 +89,13 @@ def _unpack_affect(affect):
 		return 32,False,False
 
 
-def build(mac, func, priority=32, state=False, async=False, encrypted=False, ns=0x0, args=[]):
+def build(mac, func, args=[], priority=32, state=False, async=False, encrypted=False, ns=0x0):
 	affect = _get_affect(priority,state,async)
 	return _Builder.build(mac,func,args,affect,ns)
 
 # RETURN: func, args, priority, state, async, dir, encrypted
-def parse(port):
-	func,args,affect,dir = _Parser.parse(port)
+def parse(port, header):
+	func,args,affect,dir = _Parser.parse(port,header)
 	priority,state,async = _unpack_affect(affect)
 	return func,args,priority,state,async,dir,False
 

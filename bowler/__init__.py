@@ -1,8 +1,30 @@
-version = 3
+from serial import SerialTimeoutException
 
-def detect_version(port):
-	global version
-	version = 3
+_version = None
+SUPPORTED_VERSIONS = (4,3)
+
+def detect_version(dyio):
+	global _version
+
+	for ver in SUPPORTED_VERSIONS:
+		if _detect_specific_version(dyio,ver):
+			_version = ver
+			break
+	else:
+		raise ValueError("Unsupported version detcted")
+	
+	return _version
+
+def _detect_specific_version(dyio, ver):
+	global _version
+	_version = ver
+	datagram = build_datagram(dyio.mac,"_png")
+	send_datagram(dyio.port,datagram)
+	try:
+		receive_datagram(dyio.port)
+		return True
+	except SerialTimeoutException:
+		return False
 
 class _DatagramBuilder(object):
 	@staticmethod
@@ -29,27 +51,38 @@ class _DatagramBuilder(object):
 class _DatagramParser(object):
 	@staticmethod
 	def get(port):
-		print port.inWaiting()
-		version = bytearray(port.read(1))[0]
+		version_data = port.read(1)
+		if not version_data:
+			raise SerialTimeoutException("A timeout occurred while waiting for an incoming packet.")
+
+		version = bytearray(version_data)[0]
+		lib = None
 		if version==3:
-			return _bowlerv3.parse
+			lib = _bowlerv3
 		elif version==4:
-			return _bowlerv4.parse
+			lib = _bowlerv4
 		else:
 			raise ValueError("Received a packet from an unimplemented version of the Bolwer protocol.")
-			
+		
+		parser,length = lib.parse,lib.LENGTH
+		header_data = port.read(length-1)
+		if not header_data:
+			raise SerialTimeoutException("A timeout occurred while waiting for an incoming packet.")
+		
+		return parser,(bytearray([version]) + header_data)
+
 from bowler import _bowlerv3,_bowlerv4
 
 Affect = _bowlerv3.Affect
 
-def build_datagram(mac, func, priority=32, state=False, async=False, encrypted=False, ns=0x0, args=[]):
-	builder = _DatagramBuilder.get(version)
-	return builder(mac,func,priority,state,async,encrypted,ns,args)
+def build_datagram(mac, func, args=[], priority=31, state=False, async=False, encrypted=False, ns=0x0):
+	builder = _DatagramBuilder.get(_version)
+	return builder(mac,func,args,priority,state,async,encrypted,ns)
 
 def send_datagram(port, datagram):
 	port.write(datagram)
 	port.flush()
 
 def receive_datagram(port):
-	parser = _DatagramParser.get(port)
-	return parser(port)
+	parser,header = _DatagramParser.get(port)
+	return parser(port,header)
